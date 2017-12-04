@@ -6,6 +6,7 @@ def run(linear=32):
    dat = h5py.File('data/preprocessed/clevr.h5', 'r')
 
    for split in ['Train', 'Val']:
+      T()
       imgs    = dat[split + 'Imgs']
       programs  = dat[split + 'Programs']
       pMask     = dat[split + 'ProgramMask']

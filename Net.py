@@ -115,8 +115,8 @@ def test():
 
 
 if __name__ == '__main__':
-   load = False
-   validate = False
+   load = True
+   validate = True
    human = False
    multibatch = False
    linear = False
@@ -124,12 +124,12 @@ if __name__ == '__main__':
    cuda = True#All the cudas
    root='saves/' + sys.argv[1] + '/'
    saver = utils.SaveManager(root)
-   maxSamples = None
-   model = 'math'
+   maxSamples = 2000
+   model = 'npi'
    
    #Hyperparams
    embedDim = 300
-   eta = 1e-4
+   eta = 1e-5
 
    #Params
    humanProb = 0.00
@@ -149,7 +149,7 @@ if __name__ == '__main__':
       if not multibatch:
          trainBatcher, validBatcher = dataBatcher(batchSz, 
                maxSamples, human=human, stack=stack)
-         trainBatcher = NPIBatcher(trainBatcher)
+         #trainBatcher = NPIBatcher(trainBatcher)
          validBatcher = NPIBatcher(validBatcher)
       else:
          T()

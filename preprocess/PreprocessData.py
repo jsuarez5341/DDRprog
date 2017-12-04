@@ -67,7 +67,7 @@ def preprocessPrograms(programs, vocab, fAppend, maxLen=45, npi=True):
       data = f.create_dataset(fAppend+'ProgramMask', data=retMask)
 
 def runTxt():
-   splits = ['train', 'val']
+   splits = ['test']
    for split in splits:
       with open('data/clevr/questions/CLEVR_'+split+'_questions.json') as f:
          split = split[0].upper() + split[1:] 
@@ -101,7 +101,7 @@ def runImgs(cuda=True):
    if cuda:
       resnet.cuda()
 
-   splits = ['train', 'val']
+   splits = ['Train', 'Val']
    for split in splits:
       imgNames = sorted(os.listdir('data/clevr/images/'+split))
       imgInds  = [int(e[12:-4]) for e in imgNames]

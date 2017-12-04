@@ -2,12 +2,15 @@ import numpy as np
 import sys
 from pdb import set_trace as T
 import time
+from collections import defaultdict
 
 import torch as t
 import torch.nn.functional as F
 from torch import nn
 from torch.autograd import Variable
 import torch.nn.init as init
+
+from lib import nlp
 
 #Generic
 def invertDict(x):
@@ -97,6 +100,60 @@ def initWeights(net, scheme='orthogonal'):
       elif scheme == 'xavier':
          init.xavier_normal(e)
 
+class ErrorBreakdown:
+   def __init__(self):
+      vocab, inv = nlp.buildVocab('data/vocab/ProgramVocab.txt')
+      self.classNameDict = inv
+      self.correct = defaultdict(int)
+      self.total = defaultdict(int)
+
+   def update(self, keys, correct):
+      vals = [self.classNameDict[k] for k in keys]
+      n = len(correct)
+      for i in range(n):
+         val, cor = vals[i], correct[i]
+         if cor:
+            self.correct[vals[i]] += 1
+         self.total[vals[i]] += 1
+
+   @property
+   def scores(self):
+      new = {}
+      for k in self.correct.keys():
+         new[k[2:]] = (self.correct[k], self.total[k])
+
+      groups = {
+      'exist': 'exist'.split(), 
+      'count': 'count'.split(), 
+      'compare_integer': 'equal_integer less_than greater_than'.split(), 
+      'query': 'query_size query_color query_material query_shape'.split(), 
+      'compare_attr': 'equal_size equal_color equal_material equal_shape'.split()
+      }
+
+      groupAccs = {}
+      for groupKey in groups.keys():
+         group = groups[groupKey]
+         groupAcc = [0, 0]
+         for k in group:
+            cor, tot = new[k] 
+            groupAcc[0] += cor
+            groupAcc[1] += tot
+         groupAccs[groupKey] = groupAcc[0] / float(groupAcc[1])
+
+      for k in groupAccs.keys():
+         print(k, ': ', groupAccs[k])
+
+      print()
+      for k in new.keys():
+         new[k] = new[k][0] / float(new[k][1])
+            
+
+      order = 'exist count equal_integer less_than greater_than query_size query_color query_material query_shape equal_size equal_color equal_material equal_shape'.split(' ')
+      for k in order:
+         if k in new.keys():
+            print(k, ': ', new[k])
+      return new
+
 class SaveManager():
    def __init__(self, root):
       self.tl, self.ta, self.vl, self.va = [], [], [], []
@@ -111,7 +168,7 @@ class SaveManager():
          print('NaN in update. Locking. Call refresh() to reset')
          return
 
-      if self.epoch() == 1 or va[1] < np.min([e[1] for e in self.va]):
+      if self.epoch() == 1 or va[1] > np.max([e[1] for e in self.va]):
          self.stateDict = net.state_dict().copy()
          t.save(net.state_dict(), self.root+'weights')
 
@@ -210,6 +267,7 @@ def runData(net, opt, batcher, criterion=maskedCE,
    meanAcc  = CMA()
    meanLoss = CMA(n=1)
 
+   errs = ErrorBreakdown()
    for i in range(iters):
       try:
          if verbose and i % int(iters/numPrints) == 0:
@@ -222,7 +280,13 @@ def runData(net, opt, batcher, criterion=maskedCE,
       a, y, mask = runMinibatch(net, batcher, trainable=trainable, cuda=cuda, volatile=not trainable)
       
       #Compute loss/acc with proper criterion/masking
-      loss, acc = mathStats(criterion, a, y)
+      loss, acc = stats(criterion, a, y)
+      progLabels = y[0].data.cpu().numpy()
+      batch = progLabels.shape[0]
+      ends = np.argmax(progLabels == 0, 1)
+      ends = progLabels[np.arange(batch), ends-1]
+      correct = (t.max(a[1], 1)[1] == y[1]).cpu().data.numpy().ravel()
+      errs.update(ends, correct)
    
       random = False
       if random and trainable:
@@ -244,6 +308,7 @@ def runData(net, opt, batcher, criterion=maskedCE,
       #Accumulate average
       meanLoss.update([loss.data[0]])
       meanAcc.update(acc)
+   errs.scores
 
    return meanLoss.cma, meanAcc.cma
 
@@ -258,7 +323,7 @@ def mathStats(criterion, a, y):
    return loss, (0, loss.data[0])
  
 def stats(criterion, a, y):
-   maskCriterion = nn.CrossEntropyLoss(ignore_index=0)
+   #maskCriterion = nn.CrossEntropyLoss(ignore_index=0)
    pPred, aPred = a
    p, a = y
    batch, sLen, vocab = pPred.size()

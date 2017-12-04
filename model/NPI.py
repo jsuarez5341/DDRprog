@@ -177,7 +177,7 @@ class NPI(nn.Module):
       parallel = False
       q, prog, ans, imgs = x
 
-      if True :#not human and trainable:
+      if not human and trainable:
          prog = prog.data.cpu().numpy()
       progPreds = []
 
@@ -204,7 +204,7 @@ class NPI(nn.Module):
          progPreds += [pPred]
  
          #Feed in prediction (val) or ground truth (train)
-         if True:#not human and trainable:
+         if not human and trainable:
             p = prog[:, i]
          else:
             _, p = t.max(pPred, 1)
